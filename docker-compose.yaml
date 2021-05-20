@@ -98,3 +98,23 @@ services:
     volumes:
       - ./data/grafana:/var/lib/grafana
       - ./docker/grafana/provisioning:/etc/grafana/provisioning
+
+  producer:
+    build:
+      context: kafka-producer
+    environment: 
+      - BOOTSTRAP_SERVER=kafka1:19091
+      - TWITTER_TOPICS="corinthians,palmeiras,santos,são paulo"
+      - CONSUMER_KEY=${MY_CONSUMER_KEY}
+      - CONSUMER_SECRET=${MY_CONSUMER_SECRET}
+      - TOKEN=${MY_TOKEN}
+      - SECRET=${MY_SECRET}
+  
+  consumer:
+    build:
+      context: kafka-consumer
+    environment: 
+      - BOOTSTRAP_SERVER=kafka1:19091
+      - HOSTNAME=anishitani-1935832896.us-east-1.bonsaisearch.net
+      - ES_USERNAME=${MY_ES_USERNAME}
+      - ES_PASSWORD=${MY_ES_PASSWORD}

@@ -18,16 +18,17 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class TwitterProducer {
 
     private static final Logger log = LoggerFactory.getLogger(TwitterProducer.class);
 
-    private static final List<String> TOPICS = Arrays.asList("corinthians", "palmeiras", "são paulo", "santos");
     private static final boolean ENABLE_SAFE_PRODUCER = false;
     private static final boolean ENABLE_HIGH_THROUGHPUT = true;
 
@@ -37,6 +38,7 @@ public class TwitterProducer {
     private final String token;
     private final String secret;
     private final String bootstrapServer;
+    private final List<String> topics;
 
     public TwitterProducer() {
         this.consumerKey = System.getenv("CONSUMER_KEY");
@@ -44,6 +46,10 @@ public class TwitterProducer {
         this.token = System.getenv("TOKEN");
         this.secret = System.getenv("SECRET");
         this.bootstrapServer = System.getenv("BOOTSTRAP_SERVER");
+        this.topics = Arrays.stream(Optional.ofNullable(System.getenv("TWITTER_TOPICS"))
+                .orElseThrow(() -> new RuntimeException("Please set env var TWITTER_TOPICS=topicA,topicB,etc."))
+                .split(","))
+                .collect(Collectors.toList());
     }
 
     public static void main(String[] args) {
@@ -94,16 +100,16 @@ public class TwitterProducer {
         props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
-        if(ENABLE_SAFE_PRODUCER) {
+        if (ENABLE_SAFE_PRODUCER) {
             props.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
             props.setProperty(ProducerConfig.ACKS_CONFIG, "all");
             // retries and max_in_flight are correct for version 2.7
         }
 
-        if(ENABLE_HIGH_THROUGHPUT) {
+        if (ENABLE_HIGH_THROUGHPUT) {
             props.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
             props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "20");
-            props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32*1024));
+            props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32 * 1024));
             // retries and max_in_flight are correct for version 2.7
         }
 
@@ -113,7 +119,7 @@ public class TwitterProducer {
     public Client createTwitterClient(BlockingQueue<String> msgQueue) {
         Hosts hosebirdHosts = new HttpHosts(Constants.STREAM_HOST);
         StatusesFilterEndpoint hosebirdEndpoint = new StatusesFilterEndpoint();
-        hosebirdEndpoint.trackTerms(TOPICS);
+        hosebirdEndpoint.trackTerms(topics);
 
         Authentication hosebirdAuth = new OAuth1(consumerKey, consumerSecret, token, secret);
 
