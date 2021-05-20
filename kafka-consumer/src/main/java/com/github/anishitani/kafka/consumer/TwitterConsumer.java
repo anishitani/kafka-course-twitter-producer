@@ -1,6 +1,5 @@
 package com.github.anishitani.kafka.consumer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
@@ -52,10 +51,15 @@ public class TwitterConsumer {
         while (true) {
                ConsumerRecords<String, String> records = consumer.poll(Duration.of(100, ChronoUnit.MILLIS));
                for (ConsumerRecord<String, String> record : records) {
-                   IndexRequest indexRequest = new IndexRequest("twitter").source(parseTweet(record), XContentType.JSON);
+                   Tweet tweet = mapper.readValue(record.value(), Tweet.class);
+                   String tweetStr = mapper.writeValueAsString(tweet);
+                   IndexRequest indexRequest = new IndexRequest("twitter")
+                           .id(tweet.id.toString())
+                           .source(tweetStr, XContentType.JSON);
+
                    IndexResponse indexResponse =  esClient.index(indexRequest, RequestOptions.DEFAULT);
                    String id = indexResponse.getId();
-                   log.info("id: {} - tweet: {}", id, parseTweet(record));
+                   log.info("id: {} - tweet: {}", id, tweetStr);
                    try {
                        Thread.sleep(1000 );
                    } catch (InterruptedException e) {
@@ -64,11 +68,6 @@ public class TwitterConsumer {
                }
 
         }
-    }
-
-    private static String parseTweet(ConsumerRecord<String, String> record) throws JsonProcessingException {
-        Tweet tweet = mapper.readValue(record.value(), Tweet.class);
-        return mapper.writeValueAsString(tweet);
     }
 
     public static RestHighLevelClient createElasticSearchClient() {

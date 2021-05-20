@@ -71,7 +71,7 @@ services:
     volumes:
       - ./data/kafka3/data:/var/lib/kafka/data
     depends_on:
-      - zookeepe
+      - zookeeper
 
   kowl:
     image: quay.io/cloudhut/kowl:v1.3.1
