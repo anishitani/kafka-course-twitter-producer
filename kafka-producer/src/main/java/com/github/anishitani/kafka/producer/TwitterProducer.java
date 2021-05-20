@@ -27,7 +27,7 @@ public class TwitterProducer {
 
     private static final Logger log = LoggerFactory.getLogger(TwitterProducer.class);
 
-    private static final List<String> TOPICS = Arrays.asList("America", "Colômbia", "The CDC");
+    private static final List<String> TOPICS = Arrays.asList("corinthians", "palmeiras", "são paulo", "santos");
     private static final boolean ENABLE_SAFE_PRODUCER = false;
     private static final boolean ENABLE_HIGH_THROUGHPUT = true;
 
@@ -82,6 +82,8 @@ public class TwitterProducer {
             if (msg != null) {
                 log.info(msg);
                 producer.send(new ProducerRecord<>("twitter_tweets", msg));
+            } else {
+                log.info("No messages found!");
             }
         }
     }

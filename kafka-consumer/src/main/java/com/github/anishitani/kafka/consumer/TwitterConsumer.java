@@ -34,9 +34,11 @@ public class TwitterConsumer {
     private static final String ES_USERNAME = System.getenv("ES_USERNAME");
     private static final String ES_PASSWORD = System.getenv("ES_PASSWORD");
     private static final String HOSTNAME = System.getenv("HOSTNAME");
-    private static final String BOOTSTRAP_SERVER = System.getenv("BOOTSTRAP_SERVER");;
+    private static final String BOOTSTRAP_SERVER = System.getenv("BOOTSTRAP_SERVER");
     private static final int HTTPS_PORT = 443;
     private static final String HTTPS_PROTOCOL = "https";
+
+    private static final boolean ENABLE_AUTOCOMMIT = true;
 
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -49,24 +51,28 @@ public class TwitterConsumer {
         log.info("Starting loop...");
 
         while (true) {
-               ConsumerRecords<String, String> records = consumer.poll(Duration.of(100, ChronoUnit.MILLIS));
-               for (ConsumerRecord<String, String> record : records) {
-                   Tweet tweet = mapper.readValue(record.value(), Tweet.class);
-                   String tweetStr = mapper.writeValueAsString(tweet);
-                   IndexRequest indexRequest = new IndexRequest("twitter")
-                           .id(tweet.id.toString())
-                           .source(tweetStr, XContentType.JSON);
+            ConsumerRecords<String, String> records = consumer.poll(Duration.of(100, ChronoUnit.MILLIS));
+            log.info("Received {} records", records.count());
 
-                   IndexResponse indexResponse =  esClient.index(indexRequest, RequestOptions.DEFAULT);
-                   String id = indexResponse.getId();
-                   log.info("id: {} - tweet: {}", id, tweetStr);
-                   try {
-                       Thread.sleep(1000 );
-                   } catch (InterruptedException e) {
-                       log.error("Sleep failed", e);
-                   }
-               }
+            for (ConsumerRecord<String, String> record : records) {
+                Tweet tweet = mapper.readValue(record.value(), Tweet.class);
+                String tweetStr = mapper.writeValueAsString(tweet);
+                IndexRequest indexRequest = new IndexRequest("twitter")
+                        .id(tweet.id.toString())
+                        .source(tweetStr, XContentType.JSON);
+                IndexResponse indexResponse = esClient.index(indexRequest, RequestOptions.DEFAULT);
+                log.info("id: {} - tweet: {}", indexResponse.getId(), tweetStr);
+            }
 
+            log.info("Committing offset...");
+            consumer.commitSync();
+            log.info("Committed!");
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                log.error("Sleep failed", e);
+            }
         }
     }
 
@@ -87,6 +93,10 @@ public class TwitterConsumer {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "twitter-consumer");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        if (ENABLE_AUTOCOMMIT) {
+            props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
+        }
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Collections.singleton("twitter_tweets"));
