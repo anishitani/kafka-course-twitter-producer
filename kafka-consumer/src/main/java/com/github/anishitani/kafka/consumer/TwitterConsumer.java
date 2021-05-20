@@ -12,6 +12,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -54,24 +55,26 @@ public class TwitterConsumer {
             ConsumerRecords<String, String> records = consumer.poll(Duration.of(100, ChronoUnit.MILLIS));
             log.info("Received {} records", records.count());
 
+            BulkRequest bulkRequest = new BulkRequest();
+
             for (ConsumerRecord<String, String> record : records) {
                 Tweet tweet = mapper.readValue(record.value(), Tweet.class);
                 String tweetStr = mapper.writeValueAsString(tweet);
-                IndexRequest indexRequest = new IndexRequest("twitter")
-                        .id(tweet.id.toString())
-                        .source(tweetStr, XContentType.JSON);
-                IndexResponse indexResponse = esClient.index(indexRequest, RequestOptions.DEFAULT);
-                log.info("id: {} - tweet: {}", indexResponse.getId(), tweetStr);
+                IndexRequest indexRequest
+                        = new IndexRequest("twitter").id(tweet.id.toString()).source(tweetStr, XContentType.JSON);
+                bulkRequest.add(indexRequest);
             }
+            if(records.count() > 0) {
+                esClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+                log.info("Committing offset...");
+                consumer.commitSync();
+                log.info("Committed!");
 
-            log.info("Committing offset...");
-            consumer.commitSync();
-            log.info("Committed!");
-
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                log.error("Sleep failed", e);
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+                    log.error("Sleep failed", e);
+                }
             }
         }
     }
@@ -95,7 +98,7 @@ public class TwitterConsumer {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         if (ENABLE_AUTOCOMMIT) {
             props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
+            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
         }
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
