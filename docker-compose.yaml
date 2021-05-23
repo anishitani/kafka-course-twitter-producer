@@ -109,7 +109,9 @@ services:
       - CONSUMER_SECRET=${MY_CONSUMER_SECRET}
       - TOKEN=${MY_TOKEN}
       - SECRET=${MY_SECRET}
-  
+    depends_on:
+      - kafka1
+ 
   consumer:
     build:
       context: kafka-consumer
@@ -118,3 +120,5 @@ services:
       - HOSTNAME=anishitani-1935832896.us-east-1.bonsaisearch.net
       - ES_USERNAME=${MY_ES_USERNAME}
       - ES_PASSWORD=${MY_ES_PASSWORD}
+    depends_on:
+      - kafka1
